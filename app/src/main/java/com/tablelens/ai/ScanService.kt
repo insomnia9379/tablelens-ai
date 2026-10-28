@@ -133,7 +133,7 @@ class ScanService : Service() {
         densityDpi = resources.displayMetrics.densityDpi
         reader = ImageReader.newInstance(w, h, PixelFormat.RGBA_8888, 2)
         virtualDisplay = p.createVirtualDisplay(
-            "TableLensAI", w, h, densityDpi,
+            "CasinoCoach", w, h, densityDpi,
             DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
             reader!!.surface, null, main
         )
@@ -177,7 +177,7 @@ class ScanService : Service() {
     private fun scan() {
         if (scanning) return
         if (reader == null) {
-            show("ERROR", "Screen capture isn't running. Open TableLens AI and tap START.")
+            show("ERROR", "Screen capture isn't running. Open Casino Coach and tap START.")
             return
         }
         scanning = true
@@ -205,7 +205,7 @@ class ScanService : Service() {
             val advice = try {
                 ClaudeAdvisor(key).advise(toJpegBase64(frame))
             } catch (e: Exception) {
-                Advice("ERROR", "", "", "No connection to Claude. Check internet and try again.", "low")
+                Advice("", "ERROR", "", "No connection to Claude. Check internet and try again.", "low")
             } finally {
                 frame.recycle()
             }
@@ -227,8 +227,8 @@ class ScanService : Service() {
 
     private fun finishScan(advice: Advice) {
         val details = buildString {
-            if (advice.playerHand.isNotEmpty()) append("You: ${advice.playerHand}\n")
-            if (advice.dealerCard.isNotEmpty()) append("Dealer: ${advice.dealerCard}\n")
+            if (advice.game.isNotEmpty()) append("${advice.game}\n")
+            if (advice.situation.isNotEmpty()) append("${advice.situation}\n")
             append(advice.reason)
             if (advice.action != "ERROR" && advice.action != "NONE") append("\n(${advice.confidence} confidence)")
         }
@@ -257,7 +257,7 @@ class ScanService : Service() {
             }
         }
         val handle = TextView(this).apply {
-            text = "⠿ TableLens AI   ✕"
+            text = "⠿ Casino Coach   ✕"
             textSize = 13f
             setTextColor(Color.LTGRAY)
         }
@@ -322,12 +322,13 @@ class ScanService : Service() {
     }
 
     private fun show(action: String, details: String) {
-        val color = when (action) {
-            "HIT" -> Color.rgb(255, 183, 77)
-            "STAND" -> Color.rgb(129, 199, 132)
-            "DOUBLE" -> Color.rgb(100, 181, 246)
+        // Colour by the move's first word, so "HOLD K♠ K♦" and "RAISE 3x" still get a colour.
+        val color = when (action.substringBefore(' ')) {
+            "HIT", "CALL", "SPIN", "PLAY" -> Color.rgb(255, 183, 77)
+            "STAND", "CHECK", "HOLD" -> Color.rgb(129, 199, 132)
+            "DOUBLE", "BET", "RAISE", "DRAW" -> Color.rgb(100, 181, 246)
             "SPLIT" -> Color.rgb(206, 147, 216)
-            "ERROR" -> Color.rgb(239, 83, 80)
+            "FOLD", "ERROR" -> Color.rgb(239, 83, 80)
             else -> Color.WHITE
         }
         val headline = when (action) {
@@ -342,7 +343,7 @@ class ScanService : Service() {
     private fun buildNotification(): Notification {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "TableLens AI", NotificationManager.IMPORTANCE_LOW)
+            NotificationChannel(CHANNEL, "Casino Coach", NotificationManager.IMPORTANCE_LOW)
         )
         val stop = PendingIntent.getService(
             this, 0, Intent(this, ScanService::class.java).setAction(ACTION_STOP),
@@ -350,7 +351,7 @@ class ScanService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(android.R.drawable.ic_menu_view)
-            .setContentTitle("TableLens AI is ready")
+            .setContentTitle("Casino Coach is ready")
             .setContentText("Only captures the screen when you tap SCAN")
             .setOngoing(true)
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Stop", stop)

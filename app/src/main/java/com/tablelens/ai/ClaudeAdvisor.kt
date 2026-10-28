@@ -17,15 +17,15 @@ import java.time.Duration
 
 /** What the overlay shows after one scan. */
 data class Advice(
+    val game: String,
     val action: String,
-    val playerHand: String,
-    val dealerCard: String,
+    val situation: String,
     val reason: String,
     val confidence: String,
 )
 
 /**
- * Sends one screenshot to Claude and turns its answer into an [Advice].
+ * Sends one screenshot of any casino game to Claude and turns its answer into an [Advice].
  * Plain Kotlin/JVM (no Android imports) so it can be compiled and tested off-device.
  */
 class ClaudeAdvisor(apiKey: String) {
@@ -41,7 +41,7 @@ class ClaudeAdvisor(apiKey: String) {
         val params = MessageCreateParams.builder()
             .model(MODEL)
             .maxTokens(4000L)
-            // Low effort keeps each scan to a few seconds; a blackjack read is a short task.
+            // Low effort keeps each scan to a few seconds; one table read is a short task.
             .outputConfig(OutputConfig.builder().effort(OutputConfig.Effort.LOW).build())
             .system(SYSTEM_PROMPT)
             .addUserMessageOfBlockParams(
@@ -56,7 +56,7 @@ class ClaudeAdvisor(apiKey: String) {
                             )
                             .build()
                     ),
-                    ContentBlockParam.ofText("Read this blackjack screen and give your recommendation."),
+                    ContentBlockParam.ofText("Read this casino game screen and give your recommendation."),
                 )
             )
             .build()
@@ -64,7 +64,7 @@ class ClaudeAdvisor(apiKey: String) {
         val response = try {
             client.messages().create(params)
         } catch (e: UnauthorizedException) {
-            return problem("API key was rejected. Re-enter it in the TableLens AI app.")
+            return problem("API key was rejected. Re-enter it in the Casino Coach app.")
         } catch (e: RateLimitException) {
             return problem("Too many scans too fast. Wait a few seconds and tap SCAN again.")
         } catch (e: AnthropicServiceException) {
@@ -90,9 +90,9 @@ class ClaudeAdvisor(apiKey: String) {
         return try {
             val json = mapper.readTree(text.substring(start, end + 1))
             Advice(
+                game = json.path("game").asText(""),
                 action = json.path("action").asText("NONE").uppercase(),
-                playerHand = json.path("player_hand").asText(""),
-                dealerCard = json.path("dealer_upcard").asText(""),
+                situation = json.path("situation").asText(""),
                 reason = json.path("reason").asText(""),
                 confidence = json.path("confidence").asText("low"),
             )
@@ -101,28 +101,39 @@ class ClaudeAdvisor(apiKey: String) {
         }
     }
 
-    private fun problem(message: String) = Advice("ERROR", "", "", message, "low")
+    private fun problem(message: String) = Advice("", "ERROR", "", message, "low")
 
     companion object {
         const val MODEL = "claude-opus-5-5"
 
         private val SYSTEM_PROMPT = """
-            You read screenshots of an online blackjack table and recommend the next move.
+            You are Casino Coach. You read a screenshot of an online casino game, work out which game it is,
+            and recommend the single best next move for the player.
 
-            Table rules shown on this table: dealer hits soft 17, blackjack pays 3:2, insurance pays 2:1.
-            Assume 6+ decks, double on any first two cards, double after split allowed, no surrender,
-            unless the screen clearly shows otherwise. Use standard basic strategy for those rules.
-            Never recommend insurance.
+            Read the rules, pay table, bet limits and buttons that are visible and use them. When a rule is not
+            shown, assume the common online default. Use the mathematically best strategy for each game:
+            - Blackjack: basic strategy for the rules on the felt (assume 6+ decks, dealer hits soft 17,
+              double any two, double after split, no surrender if not shown). Never take insurance or even money.
+            - Video poker: the optimal hold for the exact game and pay table shown. Action is HOLD plus the cards
+              to keep, e.g. "HOLD K♠ K♦", or "DRAW 5" to discard all.
+            - Texas Hold'em and other poker vs players: FOLD, CHECK, CALL, or BET/RAISE with a size, based on
+              hand strength, position, pot odds and stack sizes shown.
+            - Three Card Poker, Ultimate Texas Hold'em, Let It Ride, Caribbean Stud, Pai Gow, Casino Hold'em,
+              Mississippi Stud and similar: the standard optimal strategy for that game.
+            - Baccarat: bet BANKER; never Tie or side bets.
+            - Roulette, craps, sic bo, keno, wheels: say which bet on screen has the lowest house edge
+              (e.g. craps Pass Line plus full odds; European over American roulette) and warn off bad bets.
+            - Slots and other no-skill games: no move changes the odds. Explain any choice on screen
+              (bonus pick, gamble feature: say skip the gamble) and otherwise answer SPIN.
 
-            Only use what is visible. If no hand is in progress, the cards are unreadable, or it is not
-            the player's turn, answer with action NONE and say why in reason.
-            If DOUBLE or SPLIT is the best play but that button is not visible, give the best available
-            move instead and mention it in reason.
+            Only use what is visible. If no decision is waiting, the cards are unreadable, or it is not the
+            player's turn, answer with action NONE and say why in reason. If the best play's button is not
+            available, give the best available move and mention it in reason.
 
             Reply with only one JSON object, no other text:
-            {"action": "HIT" | "STAND" | "DOUBLE" | "SPLIT" | "NONE",
-             "player_hand": "cards and total, e.g. 9 + K = 19",
-             "dealer_upcard": "e.g. 9",
+            {"game": "name of the game, e.g. Blackjack or Jacks or Better",
+             "action": "the move in 1-4 words, e.g. STAND, HOLD K♠ K♦, RAISE 3x, BET BANKER, NONE",
+             "situation": "what you read, e.g. You 9 + K = 19 vs dealer 9",
              "reason": "one short sentence",
              "confidence": "high" | "medium" | "low"}
         """.trimIndent()
