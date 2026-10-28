@@ -37,7 +37,7 @@ class MainActivity : AppCompatActivity() {
                     .putExtra(ScanService.EXTRA_RESULT_CODE, result.resultCode)
                     .putExtra(ScanService.EXTRA_RESULT_DATA, result.data)
                 startForegroundService(intent)
-                status.text = "Running. Open your blackjack game and tap the green SCAN button."
+                status.text = "Running. Open your casino game and tap the green SCAN button."
                 moveTaskToBack(true)
             } else {
                 status.text = "Screen sharing was not allowed. Tap START and choose \"Entire screen\"."
@@ -53,11 +53,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         layout.addView(TextView(this).apply {
-            text = "🃏 TableLens AI"
+            text = "🎰 Casino Coach"
             textSize = 30f
         })
         layout.addView(TextView(this).apply {
-            text = "Tap SCAN over your game and Claude reads the table and tells you the move."
+            text = "Blackjack, poker, video poker, baccarat, roulette, craps, slots and more. Tap SCAN over your game and Claude reads the screen and tells you the best move."
             textSize = 18f
             setPadding(0, 16, 0, 32)
         })
@@ -87,7 +87,7 @@ class MainActivity : AppCompatActivity() {
             textSize = 20f
         })
         layout.addView(Button(this).apply {
-            text = "START TABLELENS"
+            text = "START CASINO COACH"
             textSize = 20f
             setOnClickListener { start() }
         })
@@ -130,7 +130,7 @@ class MainActivity : AppCompatActivity() {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
         }
         if (!Settings.canDrawOverlays(this)) {
-            status.text = "Turn on \"Allow display over other apps\" for TableLens AI, then come back and tap START again."
+            status.text = "Turn on \"Allow display over other apps\" for Casino Coach, then come back and tap START again."
             startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             return
         }
